@@ -6,8 +6,8 @@ the MCP content-block form ({"content": [{"type": "text", "text": "..."}]}),
 the inner result object, or a whole transcript fragment containing them.
 
 Usage:
-    listing.py payload.json --format md  --top 5
-    listing.py payload.json --format html --top 12 --out listing.html
+    listing.py payload.json --format md  --top 5 --lang en
+    listing.py payload.json --format html --top 12 --lang cs --out listing.html
 """
 
 from __future__ import annotations
@@ -20,6 +20,38 @@ import sys
 from pathlib import Path
 
 CURRENCY = {"PLN": "zł", "EUR": "€", "USD": "$", "GBP": "£", "CZK": "Kč", "HUF": "Ft", "RON": "lei", "SEK": "kr", "NOK": "kr", "DKK": "kr", "CHF": "CHF", "UAH": "₴"}
+
+# UI labels per output language. Currency symbols come from CURRENCY above.
+LANG = {
+    "en": {
+        "price_unknown": "price unknown",
+        "items": "items",
+        "other_shops": "other shops",
+        "see_shop": "see in shop",
+        "search_results": "Search results",
+        "no_photo": "no photo",
+    },
+    "pl": {
+        "price_unknown": "cena nieznana",
+        "items": "pozycji",
+        "other_shops": "inne sklepy",
+        "see_shop": "zobacz w sklepie",
+        "search_results": "Wyniki wyszukiwania",
+        "no_photo": "brak zdjęcia",
+    },
+    "cs": {
+        "price_unknown": "cena neuvedena",
+        "items": "položek",
+        "other_shops": "další obchody",
+        "see_shop": "zobrazit v obchodě",
+        "search_results": "Výsledky vyhledávání",
+        "no_photo": "bez fotky",
+    },
+}
+
+
+def labels_for(lang: str) -> dict:
+    return LANG.get(lang) or LANG["en"]
 
 
 def _try_json(text: str):
@@ -88,9 +120,9 @@ def load(path: Path) -> dict:
     return candidate
 
 
-def money(price, currency: str) -> str:
+def money(price, currency: str, labels: dict) -> str:
     if price is None:
-        return "cena nieznana"
+        return labels["price_unknown"]
     symbol = CURRENCY.get(currency or "", "")
     if float(price).is_integer():
         body = f"{int(price)}"
@@ -133,58 +165,58 @@ def select(payload: dict, top: int) -> list[dict]:
     return rows[:top] if top else rows
 
 
-def render_md(payload: dict, rows: list[dict]) -> str:
+def render_md(payload: dict, rows: list[dict], labels: dict) -> str:
     lines: list[str] = []
     title = (payload.get("title") or "").strip()
     if title:
-        lines.append(f"**{title}** — {len(rows)} pozycji")
+        lines.append(f"**{title}** — {len(rows)} {labels['items']}")
         lines.append("")
     for index, item in enumerate(rows, 1):
         name = (item.get("title") or "?").strip()
-        currency = item.get("currency") or "PLN"
+        currency = item.get("currency") or ""
         price = item.get("price")
         sale = item.get("salePrice")
-        price_txt = money(price, currency)
+        price_txt = money(price, currency, labels)
         if sale is not None and price is not None and sale < price:
-            price_txt = f"~~{price_txt}~~ **{money(sale, currency)}**"
+            price_txt = f"~~{price_txt}~~ **{money(sale, currency, labels)}**"
         shop = item.get("shop") or "?"
         shops = item.get("_shops") or 1
-        shop_txt = f"{shop} (+{shops - 1} inne sklepy)" if shops > 1 else shop
+        shop_txt = f"{shop} (+{shops - 1} {labels['other_shops']})" if shops > 1 else shop
         lines.append(f"**{index}. {name}** — {price_txt}")
         image = (item.get("imageLink") or "").strip()
         if image:
             lines.append(f"![{name}]({image})")
         link = (item.get("url") or "").strip()
-        tail = f"{shop_txt} · [zobacz w sklepie]({link})" if link else shop_txt
+        tail = f"{shop_txt} · [{labels['see_shop']}]({link})" if link else shop_txt
         lines.append(tail)
         lines.append("")
     return "\n".join(lines).rstrip() + "\n"
 
 
-def render_html(payload: dict, rows: list[dict], heading: str | None = None) -> str:
-    title = heading or (payload.get("title") or "Wyniki wyszukiwania").strip()
+def render_html(payload: dict, rows: list[dict], labels: dict, heading: str | None = None) -> str:
+    title = heading or (payload.get("title") or labels["search_results"]).strip()
     cards = []
     for item in rows:
         name = (item.get("title") or "?").strip()
-        currency = item.get("currency") or "PLN"
+        currency = item.get("currency") or ""
         price = item.get("price")
         sale = item.get("salePrice")
-        price_txt = money(sale if (sale is not None and price is not None and sale < price) else price, currency)
+        price_txt = money(sale if (sale is not None and price is not None and sale < price) else price, currency, labels)
         was = ""
         if sale is not None and price is not None and sale < price:
-            was = f'<span class="was">{_html.escape(money(price, currency))}</span>'
+            was = f'<span class="was">{_html.escape(money(price, currency, labels))}</span>'
         image = (item.get("imageLink") or "").strip()
         visual = (
             f'<img src="{_html.escape(image, quote=True)}" alt="{_html.escape(name, quote=True)}" loading="lazy">'
             if image
-            else '<div class="noimg">brak zdjęcia</div>'
+            else f'<div class="noimg">{_html.escape(labels["no_photo"])}</div>'
         )
         shop = item.get("shop") or "?"
         shops = item.get("_shops") or 1
         shop_txt = f"{shop} +{shops - 1}" if shops > 1 else shop
         link = (item.get("url") or "").strip()
         cta = (
-            f'<a class="cta" href="{_html.escape(link, quote=True)}" target="_blank" rel="noopener">zobacz w sklepie</a>'
+            f'<a class="cta" href="{_html.escape(link, quote=True)}" target="_blank" rel="noopener">{_html.escape(labels["see_shop"])}</a>'
             if link
             else ""
         )
@@ -224,6 +256,7 @@ def main() -> int:
     ap.add_argument("payload", type=Path, help="file with the tool output (json)")
     ap.add_argument("--format", choices=["md", "html"], default="md")
     ap.add_argument("--top", type=int, default=5, help="max products (0 = all)")
+    ap.add_argument("--lang", default="en", help="UI label language: en, pl, cs")
     ap.add_argument("--out", type=Path, help="write HTML here instead of stdout")
     ap.add_argument("--title", help="override the heading")
     args = ap.parse_args()
@@ -233,10 +266,11 @@ def main() -> int:
     if not rows:
         print("no products in payload", file=sys.stderr)
         return 1
+    labels = labels_for(args.lang)
     if args.format == "md":
-        sys.stdout.write(render_md(payload, rows))
+        sys.stdout.write(render_md(payload, rows, labels))
     else:
-        doc = render_html(payload, rows, args.title)
+        doc = render_html(payload, rows, labels, args.title)
         if args.out:
             args.out.write_text(doc, encoding="utf-8")
             print(f"{args.out} ({len(rows)} products)")

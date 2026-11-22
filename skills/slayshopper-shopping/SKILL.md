@@ -9,7 +9,7 @@ platforms: [linux, macos, windows]
 
 # SlayShopper product search + listing
 
-> **Status: ALPHA** — endpoint MCP (`slay.cytr.us`) jest przejściowy; kontrakt odpowiedzi i pola (`availability`, `reply`, `brand`) mogą się zmienić bez zapowiedzi. Nie do produkcji.
+> **Status: ALPHA** — the MCP endpoint (`slay.cytr.us`) is transitional; the response contract and fields (`availability`, `reply`, `brand`) may change without notice. Not for production.
 
 Tool: the `shopping_assistant` tool on the **`slayshopper` MCP server** (`https://slay.cytr.us/mcp`). Your MCP client registers it under a client-specific name (e.g. `mcp__slayshopper__shopping_assistant` in Hermes) — call whichever name your client exposes. The Bearer key is supplied by your client's MCP config (env var or `Authorization` header); never hard-code it here.
 
@@ -17,29 +17,31 @@ Returns `sessionId`, `title`, `reply`, `products[]`, `selected[]`.
 
 **One call is a real shopping session** billed to the user's SlayShopper/OpenRouter key. Treat every call as costing money and 10–60 s.
 
+**Always reply to the user in the user's own language.** This skill's instructions are in English, but the output (summary, cards, verdicts) must be in whatever language the user writes.
+
 ## When to Use
 
-- The user names a product type plus a constraint (budget, use-case, size, brand): "znajdź mi X do Y zł", "słuchawki do 300 zł", "coś do spania do 200 zł".
-- The user wants price comparison, availability or "co polecasz z tej półki".
+- The user names a product type plus a constraint (budget, use-case, size, brand): "find me X under Y", "wireless headphones under 300", "something to sleep in under 200".
+- The user wants price comparison, availability, or a recommendation from a product category.
 - The user wants a *listing with photos* — that is the default output of this skill.
-- Any mention of produktów/sklepu/zakupów/ceny in a buying context, in any language.
+- Any mention of products/shops/shopping/prices in a buying context, in any language.
 
 Do **not** trigger for: general questions about a shop or marketplace, product research without buying intent (specs, reviews, history), or fetching a single URL the user already gave you **with no buying question attached**.
 
-A pasted product URL plus a value question ("opłaca się?", "dobra cena?", "warto?") **is** a price comparison — trigger, and treat the price in the pasted page as a claim to verify, not as the price.
+A pasted product URL plus a value question ("is it worth it?", "good price?", "opłaca się?") **is** a price comparison — trigger, and treat the price in the pasted page as a claim to verify, not as the price.
 
 **If in doubt whether the ask is shopping — trigger.** A wasted skill load costs a few hundred tokens; a missed one produces a raw JSON blob instead of a listing.
 
 ## Markets (multi-country)
 
-The shop set and currency depend on the user's **market**, not the query language. Determine the market from the user's country/language/context and pass it explicitly (`market`, ISO alpha-2: `PL`, `CZ`, …) when the client tool exposes it; otherwise put the country into `message` and let the backend default. Never assume Poland — a Czech user typing "iphone 15" (English) still wants CZ shops. Follow-ups keep the previous `sessionId`, which carries the market.
+The shop set and currency depend on the user's **market**, not the query language. Determine the market from the user's country/language/context and pass it explicitly (`market`, ISO alpha-2: `PL`, `CZ`, …) when the client tool exposes it; otherwise put the country into `message` and let the backend default. Never assume one country — a Czech user typing "iphone 15" (English) still wants CZ shops. Follow-ups keep the previous `sessionId`, which carries the market.
 
 ## Call discipline
 
-1. **One call per shopping question.** Put budget, use-case and excluded attributes into `message` up front ("słuchawki BT do biegania, do 300 zł, bez nausznych"). Do not call twice to "improve" results.
-2. **Refine with `sessionId`, not a new search.** Follow-ups ("a coś tańszego?", "tylko Xiaomi") get the previous `sessionId`.
+1. **One call per shopping question.** Put budget, use-case and excluded attributes into `message` up front ("wireless earbuds for running, under 300, not over-ear"). Do not call twice to "improve" results.
+2. **Refine with `sessionId`, not a new search.** Follow-ups ("anything cheaper?", "only Xiaomi") get the previous `sessionId`.
 3. **No speculative calls.** Never fire a search to build examples, to test the connection, or before the user has stated a product type and budget.
-4. **Persist the payload before rendering it.** A follow-up that must show many rows ("pokaż 50") means transcribing a 60-row payload by hand if it only lives in the transcript. Replay the same session through the MCP endpoint and write the JSON straight to disk:
+4. **Persist the payload before rendering it.** A follow-up that must show many rows ("show 50") means transcribing a 60-row payload by hand if it only lives in the transcript. Replay the same session through the MCP endpoint and write the JSON straight to disk:
 
 ```bash
 curl -sS -m 180 -X POST https://slay.cytr.us/mcp \
@@ -58,33 +60,33 @@ It counts as one session turn, so spend it deliberately — but it is cheaper th
 
 Every field shown to the user must come from the payload. Specifically:
 
-- `availability` is `"unknown"` for nearly all rows — never claim "dostępne" / "na stanie"; say "dostępność nieznana".
-- `url` is an **affiliate redirect** (`slay.cytr.us/api/go/...`), not the shop's own address. Label it as a link ("zobacz w sklepie"), never as the shop URL.
+- `availability` is `"unknown"` for nearly all rows — never claim "in stock"; say availability is unknown (in the user's language).
+- `url` is an **affiliate redirect** (`slay.cytr.us/api/go/...`), not the shop's own address. Label it as a link ("see in shop"), never as the shop URL.
 - `brand` is usually `null` — do not guess a brand from the title unless the title states it.
-- `reply` from the backend can contain mojibake (CJK characters leaking into Polish text). Read it for context, but write your own one-line summary from `products[]`; never quote `reply` verbatim when it looks corrupted.
+- `reply` from the backend can contain mojibake (CJK characters leaking into the text). Read it for context, but write your own one-line summary from `products[]`; never quote `reply` verbatim when it looks corrupted.
 
 ## Rendering the listing
 
-Use the bundled renderer — deterministic dedupe, price sort, escaping, empty-image handling:
+Use the bundled renderer — deterministic dedupe, price sort, escaping, empty-image handling. Pass the user's language with `--lang`:
 
 ```bash
 # markdown cards with photos (default, 5 items)
-python3 <skill_dir>/scripts/listing.py payload.json --format md --top 5
+python3 <skill_dir>/scripts/listing.py payload.json --format md --top 5 --lang en
 
 # HTML product grid widget (>6 products, or when the user wants to browse)
-python3 <skill_dir>/scripts/listing.py payload.json --format html --top 12 --out listing.html
+python3 <skill_dir>/scripts/listing.py payload.json --format html --top 12 --lang en --out listing.html
 ```
 
-`payload.json` may be the raw tool envelope (`{"result": "<json string>"}`), the inner object, or the whole tool-call transcript fragment — the script finds the JSON.
+`--lang` takes `en` (default), `pl`, `cs` — it only changes the UI labels (price-unknown, "see in shop", item count). Currency symbols come from each product's `currency` field. `payload.json` may be the raw tool envelope (`{"result": "<json string>"}`), the inner object, or the whole tool-call transcript fragment — the script finds the JSON.
 
 ### Markdown cards (default)
 
 Remote image URLs render inline in most chat surfaces. The script emits, per product:
 
 ```
-**1. Xiaomi Redmi Buds 5 Black** — 169,00 zł
+**1. Xiaomi Redmi Buds 5 Black** — 169 zł
 ![Xiaomi Redmi Buds 5 Black](https://geekstore.pl/.../pol_is_Sluchawki...jpg)
-geekstore-pl · [zobacz w sklepie](https://slay.cytr.us/api/go/...)
+geekstore-pl · [see in shop](https://slay.cytr.us/api/go/...)
 ```
 
 Paste the output as-is. Add one sentence of your own before it: the cheapest sensible option and the trade-off. Do not re-list specs the cards already show.
@@ -97,19 +99,19 @@ The renderer writes a self-contained `listing.html` (photo, title, price, `saleP
 
 When a live check contradicts the payload, trust the page and fix the tile: prices drift, and `availability: "in_stock"` is often stale. Mark verified tiles with a badge and dim the sold-out ones. The same goes for a URL the user pasted themselves — re-read the live price and quote that; a stale sticker price changes the verdict.
 
-## Answering "opłaca się?" / "is it worth it?"
+## Answering "is it worth it?" / "opłaca się?"
 
 That is a decision, not a listing request. The order that works:
 
-1. **Verdict in the first sentence**, negatives unsoftened — "nie, to nie okazja" — followed by the number that justifies it.
+1. **Verdict in the first sentence**, negatives unsoftened — "no, it's not a deal" — followed by the number that justifies it.
 2. **A price table**: shop | price | per unit | delivery, cheapest first, 3–5 verified shops, no photos in the table.
 3. **The grid underneath** for opening offers: the table carries the decision, the tiles carry the click.
-4. **Reframe to unit cost**: price per unit (sztuka/gram/ml) and per month of use, and say where the bigger pack stops paying off.
+4. **Reframe to unit cost**: price per unit (piece/gram/ml) and per month of use, and say where the bigger pack stops paying off.
 5. **Shipping decides tight races.** A small sticker gap is one delivery fee, so quote the real total — pickup, courier, free-shipping thresholds — and label any fee you could not establish as unconfirmed. Never infer a fee.
 
 ## Dedupe rule
 
-Same product in several shops is normal. The script collapses rows on normalized title and keeps the cheapest, counting shops. Say "w 3 sklepach" rather than showing the same photo three times.
+Same product in several shops is normal. The script collapses rows on normalized title and keeps the cheapest, counting shops. Say "in 3 shops" rather than showing the same photo three times.
 
 ## Failure modes
 
