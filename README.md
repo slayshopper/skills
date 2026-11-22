@@ -2,6 +2,10 @@
 
 Umiejętności (skills) agentów do integracji z [SlayShopper](https://slay.cytr.us) — wyszukiwarką produktów przez MCP. Każdy skill zamienia wynik `shopping_assistant` w listing produktów ze zdjęciami, z deduplikacją, sortowaniem po cenie i regułami „nie zmyślaj".
 
+## Status: ALPHA
+
+Wczesna wersja. Endpoint MCP (`https://slay.cytr.us/mcp`) jest **przejściowy** — nie jest jeszcze pod docelową domeną. Kontrakt odpowiedzi i pola (`availability`, `reply`, `brand`) mogą się zmieniać bez gwarancji stabilności. Używaj świadomie, nie w produkcji.
+
 ## Zawartość
 
 - [`skills/slayshopper-shopping/`](skills/slayshopper-shopping/) — wyszukiwanie produktów, porównywanie cen i listing ze zdjęciami.

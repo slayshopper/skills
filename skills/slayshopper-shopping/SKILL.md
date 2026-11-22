@@ -1,13 +1,15 @@
 ---
 name: slayshopper-shopping
 description: "Use for any product search, price compare, or shopping run."
-version: 1.0.0
+version: 0.1.0-alpha
 author: SlayShopper
 license: MIT
 platforms: [linux, macos, windows]
 ---
 
 # SlayShopper product search + listing
+
+> **Status: ALPHA** — endpoint MCP (`slay.cytr.us`) jest przejściowy; kontrakt odpowiedzi i pola (`availability`, `reply`, `brand`) mogą się zmienić bez zapowiedzi. Nie do produkcji.
 
 Tool: the `shopping_assistant` tool on the **`slayshopper` MCP server** (`https://slay.cytr.us/mcp`). Your MCP client registers it under a client-specific name (e.g. `mcp__slayshopper__shopping_assistant` in Hermes) — call whichever name your client exposes. The Bearer key is supplied by your client's MCP config (env var or `Authorization` header); never hard-code it here.
 
