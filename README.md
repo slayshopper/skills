@@ -32,6 +32,18 @@ The skill assumes the `shopping_assistant` tool of the `slayshopper` MCP server 
 - **ClawHub / OpenClaw**: `openclaw skills install @slayshopper/slayshopper-shopping`
 - **Hermes**: `hermes skills install well-known:https://slay.cytr.us/.well-known/skills/slayshopper-shopping`
 
+### 3. Direct REST (no MCP client)
+
+For agents without an MCP client (plain-HTTP harness, OpenClaw/ClawHub, `fetch`-only runtimes) the skill also works over plain REST — same response, no SSE/JSON-RPC:
+
+```bash
+curl -sS -X POST https://slay.cytr.us/api/search \
+  -H "Authorization: Bearer $SLAYSHOPPER_API_KEY" -H 'Content-Type: application/json' \
+  -d '{"query":"wireless earbuds under 300","sessionId":null,"market":"PL"}'
+```
+
+See `skills/slayshopper-shopping/SKILL.md` → "REST fallback" for the full contract (`query`, `sessionId`, `market`).
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

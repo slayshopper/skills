@@ -56,6 +56,33 @@ It counts as one session turn, so spend it deliberately — but it is cheaper th
 
 5. **Treat the payload as a sample, not the market.** A session returns only a handful of shops, and its cheapest row is often not the market cheapest. After the call, price the same item directly in one or two big chains before answering.
 
+## REST fallback (no MCP client)
+
+If your agent has no MCP client (a plain-HTTP harness, OpenClaw/ClawHub, a `fetch`-only runtime), call the same search over REST. One request, same response shape — no SSE, no JSON-RPC, no envelope:
+
+```bash
+curl -sS -m 180 -X POST https://slay.cytr.us/api/search \
+  -H "Authorization: Bearer $SLAYSHOPPER_API_KEY" -H 'Content-Type: application/json' \
+  -d '{"query":"wireless earbuds for running, under 300","sessionId":null,"market":"PL"}'
+```
+
+- `query` — the shopping ask (the REST name of the MCP tool's `message`).
+- `sessionId` — previous `sessionId` to continue; `null` for a fresh session.
+- `market` — ISO alpha-2 (`PL`, `CZ`, …); `null`/omitted = account default.
+
+The 200 body is the same object the MCP tool returns — `{"sessionId","title","reply","products":[],"selected":[]}` — so feed it to `listing.py` directly (no SSE stripping). From JavaScript it is a plain `fetch`:
+
+```js
+const res = await fetch("https://slay.cytr.us/api/search", {
+  method: "POST",
+  headers: { Authorization: `Bearer ${KEY}`, "Content-Type": "application/json" },
+  body: JSON.stringify({ query, sessionId, market }),
+});
+const payload = await res.json();
+```
+
+401 without a key, 200 with one. This is the portable variant — no MCP client required.
+
 ## Never invent
 
 Every field shown to the user must come from the payload. Specifically:
