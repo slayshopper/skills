@@ -1,20 +1,20 @@
 # SlayShopper Skills
 
-Umiejętności (skills) agentów do integracji z [SlayShopper](https://slay.cytr.us) — wyszukiwarką produktów przez MCP. Każdy skill zamienia wynik `shopping_assistant` w listing produktów ze zdjęciami, z deduplikacją, sortowaniem po cenie i regułami „nie zmyślaj".
+Agent skills for integrating with [SlayShopper](https://slay.cytr.us) — a product search engine over MCP. Each skill turns the `shopping_assistant` result into a photo listing with deduplication, price sorting, and "never invent" rules.
 
 ## Status: ALPHA
 
-Wczesna wersja. Endpoint MCP (`https://slay.cytr.us/mcp`) jest **przejściowy** — nie jest jeszcze pod docelową domeną. Kontrakt odpowiedzi i pola (`availability`, `reply`, `brand`) mogą się zmieniać bez gwarancji stabilności. Używaj świadomie, nie w produkcji.
+Early version. The MCP endpoint (`https://slay.cytr.us/mcp`) is **transitional** — not yet on the final domain. The response contract and fields (`availability`, `reply`, `brand`) may change without a stability guarantee. Use deliberately, not in production.
 
-## Zawartość
+## Contents
 
-- [`skills/slayshopper-shopping/`](skills/slayshopper-shopping/) — wyszukiwanie produktów, porównywanie cen i listing ze zdjęciami.
+- [`skills/slayshopper-shopping/`](skills/slayshopper-shopping/) — product search, price comparison, and photo listing.
 
-## Instalacja
+## Installation
 
-### 1. Serwer MCP (wymagane)
+### 1. MCP server (required)
 
-Skill zakłada, że narzędzie `shopping_assistant` serwera MCP `slayshopper` jest podłączone. Klucz API generujesz na https://slay.cytr.us/settings.
+The skill assumes the `shopping_assistant` tool of the `slayshopper` MCP server is connected. Generate your API key at https://slay.cytr.us/settings.
 
 - **Hermes Agent**
   ```bash
@@ -24,14 +24,14 @@ Skill zakłada, że narzędzie `shopping_assistant` serwera MCP `slayshopper` je
   ```bash
   claude mcp add --transport http slayshopper https://slay.cytr.us/mcp --header "Authorization: Bearer $KEY"
   ```
-- **OpenCode / Claude Desktop / Cursor** — patrz https://slay.cytr.us/mcp-model-context-protocol
+- **OpenCode / Claude Desktop / Cursor** — see https://slay.cytr.us/mcp-model-context-protocol
 
 ### 2. Skill
 
-- **skills.sh** (każdy agent): `npx skills add slayshopper/skills --skill slayshopper-shopping`
+- **skills.sh** (any agent): `npx skills add slayshopper/skills --skill slayshopper-shopping`
 - **ClawHub / OpenClaw**: `openclaw skills install @slayshopper/slayshopper-shopping`
 - **Hermes**: `hermes skills install well-known:https://slay.cytr.us/.well-known/skills/slayshopper-shopping`
 
-## Licencja
+## License
 
-MIT — patrz [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE).
