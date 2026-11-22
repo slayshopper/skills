@@ -52,7 +52,7 @@ curl -sS -m 180 -X POST https://slay.cytr.us/mcp \
 
 It counts as one session turn, so spend it deliberately — but it is cheaper than a listing with dead thumbnails. Then verify: every image URL should answer `200`, and a few affiliate `go/` links should answer `302` to a real shop URL.
 
-5. **Treat the payload as a sample, not the market.** A session returns only a handful of shops, and its cheapest row is often not the market cheapest — most visibly for OTC drugs and pharmacy-only products. After the call, price the same item directly in two or three big chains before answering; `references/pl-apteka-price-check.md` has the shops and the extraction recipe.
+5. **Treat the payload as a sample, not the market.** A session returns only a handful of shops, and its cheapest row is often not the market cheapest. After the call, price the same item directly in one or two big chains before answering.
 
 ## Never invent
 
@@ -104,9 +104,8 @@ That is a decision, not a listing request. The order that works:
 1. **Verdict in the first sentence**, negatives unsoftened — "nie, to nie okazja" — followed by the number that justifies it.
 2. **A price table**: shop | price | per unit | delivery, cheapest first, 3–5 verified shops, no photos in the table.
 3. **The grid underneath** for opening offers: the table carries the decision, the tiles carry the click.
-4. **Reframe to unit cost**: price per tablet/capsule/ml/mg and per month of use, and say where the bigger pack stops paying off.
+4. **Reframe to unit cost**: price per unit (sztuka/gram/ml) and per month of use, and say where the bigger pack stops paying off.
 5. **Shipping decides tight races.** A small sticker gap is one delivery fee, so quote the real total — pickup, courier, free-shipping thresholds — and label any fee you could not establish as unconfirmed. Never infer a fee.
-6. **One line of the safety boundary** when the product is a drug, hormone or supplement stack: name the contraindication or dosing check that actually matters, then stop. No dosing plan, no "możesz spokojnie brać".
 
 ## Dedupe rule
 
