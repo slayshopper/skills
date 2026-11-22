@@ -22,13 +22,17 @@ Returns `sessionId`, `title`, `reply`, `products[]`, `selected[]`.
 - The user names a product type plus a constraint (budget, use-case, size, brand): "znajdź mi X do Y zł", "słuchawki do 300 zł", "coś do spania do 200 zł".
 - The user wants price comparison, availability or "co polecasz z tej półki".
 - The user wants a *listing with photos* — that is the default output of this skill.
-- Any mention of produktów/sklepu/zakupów/ceny in a buying context, in Polish or English.
+- Any mention of produktów/sklepu/zakupów/ceny in a buying context, in any language.
 
 Do **not** trigger for: general questions about a shop or marketplace, product research without buying intent (specs, reviews, history), or fetching a single URL the user already gave you **with no buying question attached**.
 
 A pasted product URL plus a value question ("opłaca się?", "dobra cena?", "warto?") **is** a price comparison — trigger, and treat the price in the pasted page as a claim to verify, not as the price.
 
 **If in doubt whether the ask is shopping — trigger.** A wasted skill load costs a few hundred tokens; a missed one produces a raw JSON blob instead of a listing.
+
+## Markets (multi-country)
+
+The shop set and currency depend on the user's **market**, not the query language. Determine the market from the user's country/language/context and pass it explicitly (`market`, ISO alpha-2: `PL`, `CZ`, …) when the client tool exposes it; otherwise put the country into `message` and let the backend default. Never assume Poland — a Czech user typing "iphone 15" (English) still wants CZ shops. Follow-ups keep the previous `sessionId`, which carries the market.
 
 ## Call discipline
 

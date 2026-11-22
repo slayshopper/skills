@@ -19,7 +19,7 @@ import re
 import sys
 from pathlib import Path
 
-CURRENCY = {"PLN": "zł", "EUR": "€", "USD": "$", "GBP": "£"}
+CURRENCY = {"PLN": "zł", "EUR": "€", "USD": "$", "GBP": "£", "CZK": "Kč", "HUF": "Ft", "RON": "lei", "SEK": "kr", "NOK": "kr", "DKK": "kr", "CHF": "CHF", "UAH": "₴"}
 
 
 def _try_json(text: str):
@@ -91,12 +91,12 @@ def load(path: Path) -> dict:
 def money(price, currency: str) -> str:
     if price is None:
         return "cena nieznana"
-    symbol = CURRENCY.get(currency or "PLN", currency or "PLN")
+    symbol = CURRENCY.get(currency or "", "")
     if float(price).is_integer():
         body = f"{int(price)}"
     else:
         body = f"{price:.2f}".replace(".", ",")
-    return f"{body} {symbol}"
+    return f"{body} {symbol}" if symbol else body
 
 
 def _key(item: dict) -> str:
