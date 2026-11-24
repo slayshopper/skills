@@ -1,6 +1,6 @@
 # SlayShopper Skills
 
-Agent skills for integrating with [SlayShopper](https://slay.cytr.us) — a product search engine over MCP. Each skill turns the `shopping_assistant` result into a photo listing with deduplication, price sorting, and "never invent" rules.
+Agent skills for integrating with [SlayShopper](https://slay.cytr.us) — a product search engine over MCP. Each skill drives the `shopping_assistant` tool and hands the user a server-rendered results page (`previewUrl`: photos, prices, deduplication, shop links) plus a short verdict under "never invent" rules. No local scripts or runtimes are required.
 
 ## Status: ALPHA
 
@@ -8,7 +8,7 @@ Early version. The MCP endpoint (`https://slay.cytr.us/mcp`) is **transitional**
 
 ## Contents
 
-- [`skills/slayshopper-shopping/`](skills/slayshopper-shopping/) — product search, price comparison, and photo listing.
+- [`skills/slayshopper-shopping/`](skills/slayshopper-shopping/) — product search, price comparison, and a link to the results page.
 
 ## Installation
 
