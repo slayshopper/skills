@@ -1,7 +1,7 @@
 ---
 name: slayshopper-shopping
 description: "Use for any product search, price compare, or shopping run."
-version: 0.2.0-alpha
+version: 0.3.0-alpha
 author: SlayShopper
 license: MIT
 platforms: [linux, macos, windows]
@@ -9,13 +9,14 @@ platforms: [linux, macos, windows]
 
 # SlayShopper product search
 
-> **Status: ALPHA** — the MCP endpoint (`slay.cytr.us`) is transitional; the response contract and fields (`availability`, `reply`, `brand`, `previewUrl`) may change without notice. Not for production.
+> **Status: ALPHA** — the MCP endpoint (`slay.cytr.us`) is transitional; the response contract and fields (`availability`, `brand`, `previewUrl`, `credits`) may change without notice. Not for production.
 
-Tool: the `shopping_assistant` tool on the **`slayshopper` MCP server** (`https://slay.cytr.us/mcp`). Your MCP client registers it under a client-specific name (e.g. `mcp__slayshopper__shopping_assistant` in Hermes) — call whichever name your client exposes. The Bearer key is supplied by your client's MCP config (env var or `Authorization` header); never hard-code it here.
+Tools on the **`slayshopper` MCP server** (`https://slay.cytr.us/mcp`). Your MCP client registers them under client-specific names (e.g. `mcp__slayshopper__search_products` in Hermes) — call whichever names your client exposes. The Bearer key is supplied by your client's MCP config (env var or `Authorization` header); never hard-code it here.
 
-Returns `sessionId`, `title`, `reply`, `previewUrl`, `products[]`, `selected[]`.
+- **`search_products`** — the default. You turn the user's ask into a short product phrase plus filters; SlayShopper picks the shops, filters out products that don't match the ask, and returns offers with a results page. No second LLM on the server: a few seconds, a few dozen credits.
+- **`shopping_assistant`** — a full assistant with its own model that plans several searches from a natural message. Slower (10–60 s) and pricier. Use it only when you cannot plan the search yourself.
 
-**One call is a real shopping session** billed to the user's SlayShopper/OpenRouter key. Treat every call as costing money and 10–60 s.
+Every call is **billed in credits** to the user's SlayShopper account (`credits.charged`, `credits.balance` in the `search_products` response). Treat every call as costing money.
 
 **Always reply to the user in the user's own language.** This skill's instructions are in English, but your summary and verdicts must be in whatever language the user writes.
 
@@ -34,23 +35,36 @@ A pasted product URL plus a value question ("is it worth it?", "good price?", "o
 
 ## Markets (multi-country)
 
-The shop set and currency depend on the user's **market**, not the query language. Determine the market from the user's country/language/context and pass it explicitly (`market`, ISO alpha-2: `PL`, `CZ`, …) when the client tool exposes it; otherwise put the country into `message` and let the backend default. Never assume one country — a Czech user typing "iphone 15" (English) still wants CZ shops. Follow-ups keep the previous `sessionId`, which carries the market.
+The shop set and currency depend on the user's **market**, not the query language. Determine the market from the user's country/language/context and pass `market` (ISO alpha-2: `PL`, `CZ`, …). Never assume one country — a Czech user typing "iphone 15" (English) still wants CZ shops. A `sessionId` carries the market to follow-ups. Prices (`minPrice`, `maxPrice`) are in the market's currency.
 
-## Call discipline
+## Calling `search_products`
 
-1. **One call per shopping question.** Put budget, use-case and excluded attributes into `message` up front ("wireless earbuds for running, under 300, not over-ear"). Do not call twice to "improve" results.
-2. **Refine with `sessionId`, not a new search.** Follow-ups ("anything cheaper?", "only Xiaomi") get the previous `sessionId`.
-3. **No speculative calls.** Never fire a search to build examples, to test the connection, or before the user has stated a product type and budget.
-4. **Treat the payload as a sample, not the market.** A session returns only a handful of shops, and its cheapest row is often not the market cheapest. After the call, price the same item directly in one or two big chains before answering.
+| Field | What to put there |
+| --- | --- |
+| `query` (required) | A short **product phrase**, 1–4 words, catalogue vocabulary: `wireless earbuds`, `blackout curtain`. No prices, no "I'm looking for". |
+| `intent` (recommended) | The user's **full ask** in their words, with conditions and exclusions: `earbuds for running, waterproof, not in-ear, under 300`. Products that contradict it are filtered out — this is what makes results relevant. |
+| `minPrice` / `maxPrice` | Budget in the market's currency. |
+| `brands`, `shops`, `onSale` | Only when the user asked for them. |
+| `sessionId` | From the previous response, to keep the same `previewUrl` for this topic. Omit for a new topic. |
+| `shopOffset` | Only for "show more": the previous `nextShopOffset`. At most 4 pages of 30. |
+
+1. **One call per shopping question.** Put all known constraints in `intent` and the filters up front. Do not fire variants of the same query "to improve" results.
+2. **Refinements are a new call with the same `sessionId`** ("cheaper", "only Xiaomi", "over-ear instead") — adjust `query`/`intent`/filters. The same `previewUrl` then shows the new results.
+3. **`fallbackQuery` set** means the exact phrase found nothing and the results are for a broader phrase — say so, and check the products against the ask before recommending.
+4. **Empty `products`** — tell the user, suggest a different phrase or a looser budget; do not loop through retries.
+5. **No speculative calls.** Never search to build examples or to test the connection, or before the user has named a product type.
+6. **Treat the payload as a sample, not the market.** It covers the shops picked for this query; for a buying decision, price the same item in one or two big chains before answering.
+
+`shopping_assistant` takes a natural `message` (plus `sessionId`, `market`) instead and returns `reply` and `selected[]` (its picks) on top of `products[]`.
 
 ## Showing results
 
 `previewUrl` **is the listing.** It is a page rendered by SlayShopper: photos, prices with sale badges, the same product across shops collapsed to the cheapest offer, working shop links, labels in the market's language. You do not render products yourself.
 
-1. **One sentence of your own, then the link.** Name the cheapest sensible option and the trade-off, then give `previewUrl` as a link ("see all results"). Do not re-list what the page already shows — mention at most 1–3 picks from `selected[]` by name and price.
-2. **Same session, same link.** The page shows the latest turn of the session, so after a refinement with `sessionId` the same `previewUrl` shows the new results — share it again with a one-line note on what changed.
+1. **One sentence of your own, then the link.** Name the cheapest sensible option and the trade-off, then give `previewUrl` as a link ("see all results"). Do not re-list what the page already shows — mention at most 1–3 picks by name and price. `products[]` is ordered by relevance to the ask, not by price; pick yourself.
+2. **Same session, same link.** The page shows the latest search of the session, so after a refinement with `sessionId` the same `previewUrl` shows the new results — share it again with a one-line note on what changed.
 3. **The link is unlisted, not private.** Anyone holding it can see the results (not the conversation). Share it with the user; do not post it anywhere else unless asked.
-4. **No `previewUrl`** (`null` or missing, e.g. an older backend): write up to 5 lines from `selected[]` (or the cheapest `products[]`), one per product, same product in several shops listed once:
+4. **No `previewUrl`** (`null` or missing): write up to 5 lines from `products[]`, one per product, same product in several shops listed once:
 
    ```
    **Xiaomi Redmi Buds 5 Black** — 169 zł · geekstore-pl · [see in shop](https://slay.cytr.us/api/go/...)
@@ -58,17 +72,22 @@ The shop set and currency depend on the user's **market**, not the query languag
 
    Add `![title](imageLink)` under a line only when `imageLink` is non-empty and your surface renders remote images.
 
+## Credits
+
+- `credits.charged` is what the call cost; `credits.balance` is what is left. Mention cost only if the user asks or the balance is getting low (under ~500 credits ≈ a dozen searches).
+- **"Brak kredytów" / out of credits** (HTTP 402 over REST, a tool error over MCP) — stop and tell the user their SlayShopper credits ran out; the balance is at `slay.cytr.us/settings`. Do not retry.
+
 ## REST fallback (no MCP client)
 
 If your agent has no MCP client (a plain-HTTP harness, OpenClaw/ClawHub, a `fetch`-only runtime), call the same search over REST — same response object, no SSE, no JSON-RPC:
 
 ```bash
-curl -sS -m 180 -X POST https://slay.cytr.us/api/search \
+curl -sS -m 60 -X POST https://slay.cytr.us/api/products/search \
   -H "Authorization: Bearer $SLAYSHOPPER_API_KEY" -H 'Content-Type: application/json' \
-  -d '{"query":"wireless earbuds for running, under 300","sessionId":null,"market":"PL"}'
+  -d '{"query":"wireless earbuds","intent":"wireless earbuds for running, under 300","maxPrice":300,"market":"PL"}'
 ```
 
-`query` is the MCP tool's `message`; `sessionId` continues a session (`null` = new); `market` is ISO alpha-2 (`null` = account default). 401 without a key.
+Same fields as the MCP tool (`sessionId`: `null` = new topic). 401 without a key, 402 out of credits, 400 on invalid fields (the `error` says which). The assistant variant is `POST /api/search` with `{"query": "<natural message>", "sessionId": null, "market": "PL"}`.
 
 ## Never invent
 
@@ -77,7 +96,7 @@ Every fact you state must come from the payload or a live check you made:
 - `availability` is `"unknown"` for nearly all rows — never claim "in stock"; say availability is unknown (in the user's language).
 - `url` is an **affiliate redirect** (`slay.cytr.us/api/go/...`), not the shop's own address. Label it as a link ("see in shop"), never as the shop URL.
 - `brand` is usually `null` — do not guess a brand from the title unless the title states it.
-- `reply` from the backend can contain mojibake (CJK characters leaking into the text). Read it for context, but write your own summary from `products[]`; never quote `reply` verbatim when it looks corrupted.
+- `reply` (only from `shopping_assistant`) can contain mojibake (CJK characters leaking into the text). Read it for context, but write your own summary from `products[]`; never quote `reply` verbatim when it looks corrupted.
 - The page shows prices as of the search. When a live check contradicts the payload (or a price the user pasted), quote the live price in your text and say the page may be stale for that row.
 
 ## Answering "is it worth it?" / "opłaca się?"
@@ -94,9 +113,10 @@ That is a decision, not a listing request. The order that works:
 
 - **Tool missing after config change** — MCP has no hot-reload; the client process must restart.
 - **401 / "unauthorized"** — key revoked or wrong in the MCP config; regenerate at `slay.cytr.us/settings`.
-- **Slow or empty** — calls regularly take 10–60 s; one retry is fine, three is burning credits.
+- **Out of credits** — see "Credits"; do not retry.
+- **Slow or empty** — `search_products` usually answers in seconds; one retry after a timeout is fine, three is burning credits.
 - **`previewUrl` answers 404** — the session was deleted; run a new search if the user still wants results.
 
 ## Verified contract (2026-11)
 
-`initialize` → `SlayShopper.Web 1.0.0.0`; `tools/list` → exactly one tool `shopping_assistant`; no `Mcp-Session-Id` issued (stateless); responses arrive as SSE. A real query returns ~30 `products`, 4–6 `selected` and a `previewUrl` of the form `https://slay.cytr.us/p/<token>`.
+`tools/list` → `search_products` and `shopping_assistant`; stateless (no `Mcp-Session-Id`); responses arrive as SSE. `search_products` returns `sessionId`, `previewUrl` (`https://slay.cytr.us/p/<token>`), `query`, `fallbackQuery`, up to 30 `products[]`, `more`, `nextShopOffset` and `credits {charged, balance}`.
