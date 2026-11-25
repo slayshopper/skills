@@ -1,7 +1,7 @@
 ---
 name: slayshopper-shopping
 description: "Use for any product search, price compare, or shopping run."
-version: 0.3.0-alpha
+version: 0.3.1-alpha
 author: SlayShopper
 license: MIT
 platforms: [linux, macos, windows]
@@ -41,7 +41,7 @@ The shop set and currency depend on the user's **market**, not the query languag
 
 | Field | What to put there |
 | --- | --- |
-| `query` (required) | A short **product phrase**, 1–4 words, catalogue vocabulary: `wireless earbuds`, `blackout curtain`. No prices, no "I'm looking for". |
+| `query` (required) | A short **product phrase**, 1–4 words, in the words shops use in product titles: `słuchawki do biegania`, `zasłona blackout`. **Every word must appear in the product** (prepositions like "do", "z", "i" are ignored), so leave adjectives, units and numbers out — put them in `intent` and filters. No prices, no "I'm looking for". |
 | `intent` (recommended) | The user's **full ask** in their words, with conditions and exclusions: `earbuds for running, waterproof, not in-ear, under 300`. Products that contradict it are filtered out — this is what makes results relevant. |
 | `minPrice` / `maxPrice` | Budget in the market's currency. |
 | `brands`, `shops`, `onSale` | Only when the user asked for them. |
@@ -50,10 +50,9 @@ The shop set and currency depend on the user's **market**, not the query languag
 
 1. **One call per shopping question.** Put all known constraints in `intent` and the filters up front. Do not fire variants of the same query "to improve" results.
 2. **Refinements are a new call with the same `sessionId`** ("cheaper", "only Xiaomi", "over-ear instead") — adjust `query`/`intent`/filters. The same `previewUrl` then shows the new results.
-3. **`fallbackQuery` set** means the exact phrase found nothing and the results are for a broader phrase — say so, and check the products against the ask before recommending.
-4. **Empty `products`** — tell the user, suggest a different phrase or a looser budget; do not loop through retries.
-5. **No speculative calls.** Never search to build examples or to test the connection, or before the user has named a product type.
-6. **Treat the payload as a sample, not the market.** It covers the shops picked for this query; for a buying decision, price the same item in one or two big chains before answering.
+3. **Empty `products` → one retry with a broader phrase.** Drop adjectives, units and numbers, or use the general product name (`pilarka tarczowa` instead of `pilarka cicha do desek`, `karma dla psa` instead of `karma dla psa 10kg`), keep `intent` and filters. If the retry is empty too, tell the user and suggest what to change; do not loop.
+4. **No speculative calls.** Never search to build examples or to test the connection, or before the user has named a product type.
+5. **Treat the payload as a sample, not the market.** It covers the shops picked for this query; for a buying decision, price the same item in one or two big chains before answering.
 
 `shopping_assistant` takes a natural `message` (plus `sessionId`, `market`) instead and returns `reply` and `selected[]` (its picks) on top of `products[]`.
 
@@ -114,9 +113,9 @@ That is a decision, not a listing request. The order that works:
 - **Tool missing after config change** — MCP has no hot-reload; the client process must restart.
 - **401 / "unauthorized"** — key revoked or wrong in the MCP config; regenerate at `slay.cytr.us/settings`.
 - **Out of credits** — see "Credits"; do not retry.
-- **Slow or empty** — `search_products` usually answers in seconds; one retry after a timeout is fine, three is burning credits.
+- **Slow** — `search_products` usually answers in seconds; one retry after a timeout is fine, three is burning credits. Empty results: see rule 3 under "Calling `search_products`".
 - **`previewUrl` answers 404** — the session was deleted; run a new search if the user still wants results.
 
 ## Verified contract (2026-11)
 
-`tools/list` → `search_products` and `shopping_assistant`; stateless (no `Mcp-Session-Id`); responses arrive as SSE. `search_products` returns `sessionId`, `previewUrl` (`https://slay.cytr.us/p/<token>`), `query`, `fallbackQuery`, up to 30 `products[]`, `more`, `nextShopOffset` and `credits {charged, balance}`.
+`tools/list` → `search_products` and `shopping_assistant`; stateless (no `Mcp-Session-Id`); responses arrive as SSE. `search_products` returns `sessionId`, `previewUrl` (`https://slay.cytr.us/p/<token>`), `query`, up to 30 `products[]`, `more`, `nextShopOffset` and `credits {charged, balance}`. All words of `query` (minus prepositions/conjunctions) must match; no server-side retry.
