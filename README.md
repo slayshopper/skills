@@ -1,10 +1,10 @@
 # SlayShopper Skills
 
-Agent skills for integrating with [SlayShopper](https://slay.cytr.us) — a product search engine over MCP. Each skill drives the `shopping_assistant` tool and hands the user a server-rendered results page (`previewUrl`: photos, prices, deduplication, shop links) plus a short verdict under "never invent" rules. No local scripts or runtimes are required.
+Agent skills for integrating with [SlayShopper](https://slay.cytr.us) — a product layer for AI agents over MCP. Each skill drives the `search_products` tool (you plan the query, SlayShopper picks shops and filters products) and hands the user a server-rendered results page (`previewUrl`: photos, prices, deduplication, shop links) plus a short verdict under "never invent" rules. No local scripts or runtimes are required.
 
 ## Status: ALPHA
 
-Early version. The MCP endpoint (`https://slay.cytr.us/mcp`) is **transitional** — not yet on the final domain. The response contract and fields (`availability`, `reply`, `brand`) may change without a stability guarantee. Use deliberately, not in production.
+Early version. The MCP endpoint (`https://slay.cytr.us/mcp`) is **transitional** — not yet on the final domain. The response contract and fields (`availability`, `brand`, `credits`) may change without a stability guarantee. Calls are billed in SlayShopper credits. Use deliberately, not in production.
 
 ## Contents
 
@@ -14,7 +14,7 @@ Early version. The MCP endpoint (`https://slay.cytr.us/mcp`) is **transitional**
 
 ### 1. MCP server (required)
 
-The skill assumes the `shopping_assistant` tool of the `slayshopper` MCP server is connected. Generate your API key at https://slay.cytr.us/settings.
+The skill assumes the `slayshopper` MCP server is connected (tools `search_products` and `shopping_assistant`). Generate your API key at https://slay.cytr.us/settings.
 
 - **Hermes Agent**
   ```bash
@@ -37,12 +37,12 @@ The skill assumes the `shopping_assistant` tool of the `slayshopper` MCP server 
 For agents without an MCP client (plain-HTTP harness, OpenClaw/ClawHub, `fetch`-only runtimes) the skill also works over plain REST — same response, no SSE/JSON-RPC:
 
 ```bash
-curl -sS -X POST https://slay.cytr.us/api/search \
+curl -sS -X POST https://slay.cytr.us/api/products/search \
   -H "Authorization: Bearer $SLAYSHOPPER_API_KEY" -H 'Content-Type: application/json' \
-  -d '{"query":"wireless earbuds under 300","sessionId":null,"market":"PL"}'
+  -d '{"query":"wireless earbuds","intent":"wireless earbuds for running, under 300","maxPrice":300,"market":"PL"}'
 ```
 
-See `skills/slayshopper-shopping/SKILL.md` → "REST fallback" for the full contract (`query`, `sessionId`, `market`).
+See `skills/slayshopper-shopping/SKILL.md` → "REST fallback" for the full contract.
 
 ## License
 
