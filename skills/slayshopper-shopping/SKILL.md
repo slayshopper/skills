@@ -37,7 +37,7 @@ A pasted product URL plus a value question ("is it worth it?", "good price?", "o
 
 The shop set and currency depend on the user's **market**, not the query language. Determine the market from the user's country/language/context and pass `market` (ISO alpha-2: `PL`, `CZ`, …) on the first call of a topic. Never assume one country — a Czech user typing "iphone 15" (English) still wants CZ shops. A `sessionId` carries the market to follow-ups. Prices (`minPrice`, `maxPrice`) are in the market's currency.
 
-**Not every market is live yet.** A market with no shops is rejected before anything is billed: a tool error over MCP, HTTP 400 over REST, with a message like `Rynek CZ nie jest jeszcze obsługiwany. Obsługiwane rynki: PL.` (the text is Polish; the codes after the colon are the supported markets). Then:
+**Not every market is live yet.** A market with no shops is rejected before anything is billed: a tool error over MCP, HTTP 400 over REST. The message names the market you sent and lists the supported market codes (e.g. you sent `CZ`, supported: `PL`). Its wording and language may change — recognise it by the market code you sent plus the list of codes, not by exact text. Then:
 
 - Tell the user, in their language, that SlayShopper does not cover their country yet and which markets it does cover.
 - **Do not silently retry with `PL`** (or any other market) — foreign shops mean foreign prices, currency and delivery. Search another market only if the user says they want it.
@@ -120,7 +120,7 @@ That is a decision, not a listing request. The order that works:
 - **Tool missing after config change** — MCP has no hot-reload; the client process must restart.
 - **401 / "unauthorized"** — key revoked or wrong in the MCP config; regenerate at `slay.cytr.us/settings`.
 - **Out of credits** — see "Credits"; do not retry.
-- **"Rynek XX nie jest jeszcze obsługiwany"** — unsupported market; see "Markets". Tell the user, do not fall back to `PL`.
+- **Error naming your `market` and listing supported codes** — unsupported market; see "Markets". Tell the user, do not fall back to `PL`.
 - **Slow** — `search_products` usually answers in seconds; one retry after a timeout is fine, three is burning credits. Empty results: see rule 3 under "Calling `search_products`".
 - **`previewUrl` answers 404** — the session was deleted; run a new search if the user still wants results.
 
