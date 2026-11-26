@@ -1,7 +1,7 @@
 ---
 name: slayshopper-shopping
 description: "Use for any product search, price compare, or shopping run."
-version: 0.3.2-alpha
+version: 0.3.3-alpha
 author: SlayShopper
 license: MIT
 platforms: [linux, macos, windows]
@@ -81,7 +81,7 @@ The shop set and currency depend on the user's **market**, not the query languag
 ## Credits
 
 - `credits.charged` is what the call cost; `credits.balance` is what is left. Mention cost only if the user asks or the balance is getting low (under ~500 credits ≈ a dozen searches).
-- **"Brak kredytów" / out of credits** (HTTP 402 over REST, a tool error over MCP) — stop and tell the user their SlayShopper credits ran out; the balance is at `slay.cytr.us/settings`. Do not retry.
+- **Out of credits** (HTTP 402 over REST, a tool error over MCP; the message starts with "Out of credits") — stop and tell the user their SlayShopper credits ran out; the balance is at `slay.cytr.us/settings`. Do not retry.
 
 ## REST fallback (no MCP client)
 
@@ -126,4 +126,4 @@ That is a decision, not a listing request. The order that works:
 
 ## Verified contract (2026-11)
 
-`tools/list` → `search_products` and `shopping_assistant`; stateless (no `Mcp-Session-Id`); responses arrive as SSE. `search_products` returns `sessionId`, `previewUrl` (`https://slay.cytr.us/p/<token>`), `query`, up to 30 `products[]`, `more`, `nextShopOffset` and `credits {charged, balance}`. All words of `query` (minus prepositions/conjunctions) must match; no server-side retry. Each shop belongs to one market; an explicit `market` without shops is rejected before billing, and the error lists the supported markets.
+`tools/list` → `search_products` and `shopping_assistant`; stateless (no `Mcp-Session-Id`); responses arrive as SSE. `search_products` returns `sessionId`, `previewUrl` (`https://slay.cytr.us/p/<token>`), `query`, up to 30 `products[]`, `more`, `nextShopOffset` and `credits {charged, balance}`. All words of `query` (minus prepositions/conjunctions) must match; no server-side retry. Each shop belongs to one market; an explicit `market` without shops is rejected before billing, and the error lists the supported markets. Error messages are in English (a tool error over MCP, `{"error": "..."}` over REST); translate them for the user, never paste them raw.
