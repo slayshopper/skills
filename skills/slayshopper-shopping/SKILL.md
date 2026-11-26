@@ -1,7 +1,7 @@
 ---
 name: slayshopper-shopping
 description: "Use for any product search, price compare, or shopping run."
-version: 0.3.1-alpha
+version: 0.3.2-alpha
 author: SlayShopper
 license: MIT
 platforms: [linux, macos, windows]
@@ -35,7 +35,13 @@ A pasted product URL plus a value question ("is it worth it?", "good price?", "o
 
 ## Markets (multi-country)
 
-The shop set and currency depend on the user's **market**, not the query language. Determine the market from the user's country/language/context and pass `market` (ISO alpha-2: `PL`, `CZ`, …). Never assume one country — a Czech user typing "iphone 15" (English) still wants CZ shops. A `sessionId` carries the market to follow-ups. Prices (`minPrice`, `maxPrice`) are in the market's currency.
+The shop set and currency depend on the user's **market**, not the query language. Determine the market from the user's country/language/context and pass `market` (ISO alpha-2: `PL`, `CZ`, …) on the first call of a topic. Never assume one country — a Czech user typing "iphone 15" (English) still wants CZ shops. A `sessionId` carries the market to follow-ups. Prices (`minPrice`, `maxPrice`) are in the market's currency.
+
+**Not every market is live yet.** A market with no shops is rejected before anything is billed: a tool error over MCP, HTTP 400 over REST. The message names the market you sent and lists the supported market codes (e.g. you sent `CZ`, supported: `PL`). Its wording and language may change — recognise it by the market code you sent plus the list of codes, not by exact text. Then:
+
+- Tell the user, in their language, that SlayShopper does not cover their country yet and which markets it does cover.
+- **Do not silently retry with `PL`** (or any other market) — foreign shops mean foreign prices, currency and delivery. Search another market only if the user says they want it.
+- Do not retry the same market; the answer won't change within the conversation.
 
 ## Calling `search_products`
 
@@ -43,6 +49,7 @@ The shop set and currency depend on the user's **market**, not the query languag
 | --- | --- |
 | `query` (required) | A short **product phrase**, 1–4 words, in the words shops use in product titles: `słuchawki do biegania`, `zasłona blackout`. **Every word must appear in the product** (prepositions like "do", "z", "i" are ignored), so leave adjectives, units and numbers out — put them in `intent` and filters. No prices, no "I'm looking for". |
 | `intent` (recommended) | The user's **full ask** in their words, with conditions and exclusions: `earbuds for running, waterproof, not in-ear, under 300`. Products that contradict it are filtered out — this is what makes results relevant. |
+| `market` | ISO alpha-2 country code of the **user's** shops (`PL`, `CZ`, …) — from their country/language, not from the language of `query`. Pass it on the first call of a topic; with `sessionId` it can be omitted (the session keeps it). Omitted with no session = `PL`. See "Markets". |
 | `minPrice` / `maxPrice` | Budget in the market's currency. |
 | `brands`, `shops`, `onSale` | Only when the user asked for them. |
 | `sessionId` | From the previous response, to keep the same `previewUrl` for this topic. Omit for a new topic. |
@@ -54,7 +61,7 @@ The shop set and currency depend on the user's **market**, not the query languag
 4. **No speculative calls.** Never search to build examples or to test the connection, or before the user has named a product type.
 5. **Treat the payload as a sample, not the market.** It covers the shops picked for this query; for a buying decision, price the same item in one or two big chains before answering.
 
-`shopping_assistant` takes a natural `message` (plus `sessionId`, `market`) instead and returns `reply` and `selected[]` (its picks) on top of `products[]`.
+`shopping_assistant` takes a natural `message` (plus `sessionId`, `market`) instead and returns `reply` and `selected[]` (its picks) on top of `products[]`. `market` works exactly as in `search_products`: the user's country code, kept by `sessionId`, and the same "not supported yet" error (see "Markets").
 
 ## Showing results
 
@@ -86,7 +93,7 @@ curl -sS -m 60 -X POST https://slay.cytr.us/api/products/search \
   -d '{"query":"wireless earbuds","intent":"wireless earbuds for running, under 300","maxPrice":300,"market":"PL"}'
 ```
 
-Same fields as the MCP tool (`sessionId`: `null` = new topic). 401 without a key, 402 out of credits, 400 on invalid fields (the `error` says which). The assistant variant is `POST /api/search` with `{"query": "<natural message>", "sessionId": null, "market": "PL"}`.
+Same fields as the MCP tool (`sessionId`: `null` = new topic). 401 without a key, 402 out of credits, 400 on invalid fields or an unsupported `market` (the `error` says which — see "Markets"). The assistant variant is `POST /api/search` with `{"query": "<natural message>", "sessionId": null, "market": "PL"}`.
 
 ## Never invent
 
@@ -113,9 +120,10 @@ That is a decision, not a listing request. The order that works:
 - **Tool missing after config change** — MCP has no hot-reload; the client process must restart.
 - **401 / "unauthorized"** — key revoked or wrong in the MCP config; regenerate at `slay.cytr.us/settings`.
 - **Out of credits** — see "Credits"; do not retry.
+- **Error naming your `market` and listing supported codes** — unsupported market; see "Markets". Tell the user, do not fall back to `PL`.
 - **Slow** — `search_products` usually answers in seconds; one retry after a timeout is fine, three is burning credits. Empty results: see rule 3 under "Calling `search_products`".
 - **`previewUrl` answers 404** — the session was deleted; run a new search if the user still wants results.
 
 ## Verified contract (2026-11)
 
-`tools/list` → `search_products` and `shopping_assistant`; stateless (no `Mcp-Session-Id`); responses arrive as SSE. `search_products` returns `sessionId`, `previewUrl` (`https://slay.cytr.us/p/<token>`), `query`, up to 30 `products[]`, `more`, `nextShopOffset` and `credits {charged, balance}`. All words of `query` (minus prepositions/conjunctions) must match; no server-side retry.
+`tools/list` → `search_products` and `shopping_assistant`; stateless (no `Mcp-Session-Id`); responses arrive as SSE. `search_products` returns `sessionId`, `previewUrl` (`https://slay.cytr.us/p/<token>`), `query`, up to 30 `products[]`, `more`, `nextShopOffset` and `credits {charged, balance}`. All words of `query` (minus prepositions/conjunctions) must match; no server-side retry. Each shop belongs to one market; an explicit `market` without shops is rejected before billing, and the error lists the supported markets.
